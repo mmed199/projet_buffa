@@ -22,17 +22,26 @@
                 </template>
                 <v-card>
                   <v-card-title>
-                    <span class="headline">Add</span>
+                    <span class="headline">{{ formTitle }}</span>
                   </v-card-title>
 
                   <v-card-text>
-                    <v-container></v-container>
+                    <v-container>
+                      <v-row>
+                        <v-col cols="12" sm="6" md="6">
+                          <v-text-field v-model="editedItem.name" label="Nom"></v-text-field>
+                        </v-col>
+                        <v-col cols="12" sm="6" md="6">
+                          <v-text-field v-model="editedItem.cuisine" label="Cuisine"></v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-container>
                   </v-card-text>
 
                   <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn color="blue darken-1" text @click="fermer">Cancel</v-btn>
-                    <v-btn color="blue darken-1" text >Save</v-btn>
+                    <v-btn color="blue darken-1" text @click="fermer">Fermer</v-btn>
+                    <v-btn color="blue darken-1" text @click="enregistrer">Enregistrer</v-btn>
                   </v-card-actions>
                 </v-card>
               </v-dialog>
@@ -72,11 +81,11 @@
             <v-btn class="ma-2" color="teal darken-2" :href="'restaurant/' + item._id">
               <v-icon color="white">mdi-plus-circle</v-icon>
             </v-btn>
-            <v-btn class="ma-2" color="lime darken-2">
-              <v-icon color="white" >mdi-pencil</v-icon>
+            <v-btn class="ma-2" color="lime darken-2" @click="modifier(item)">
+              <v-icon color="white">mdi-pencil</v-icon>
             </v-btn>
-            <v-btn class="ma-2" color="red darken-2">
-              <v-icon color="white" @click="supprimer(item._id)">mdi-delete</v-icon>
+            <v-btn class="ma-2" color="red darken-2" @click="supprimer(item._id)">
+              <v-icon color="white">mdi-delete</v-icon>
             </v-btn>
           </template>
         </v-data-table>
@@ -90,7 +99,7 @@ export default {
   name: "restaurantsTable",
   data() {
     return {
-      url: "http://localhost:8080/api/restaurants",
+      url: "https://ancient-reaches-45100.herokuapp.com/api/restaurants",
       headers: [
         { text: "Nom", value: "name", class: "title font-weight-black" },
         { text: "Cuisine", value: "cuisine", class: "title font-weight-black" },
@@ -102,6 +111,11 @@ export default {
         }
       ],
       dialog: false,
+      editedItem: {
+        id: -1,
+        name: "",
+        cuisine: ""
+      },
       footerProps: {
         disableItemsPerPage: true,
         itemsperPageOptions: [0, 0],
@@ -115,15 +129,29 @@ export default {
       count: 0
     };
   },
-  watch: {
-    page: function() {
-      this.getRestaurantsFromServer();
-    }
-  },
+
   mounted() {
     console.log("AVANT RENDU HTML");
     this.getRestaurantsFromServer();
   },
+
+  watch: {
+    page() {
+      this.getRestaurantsFromServer();
+    },
+    dialog(val) {
+      val || this.fermer();
+    }
+  },
+
+  computed: {
+    formTitle() {
+      return this.editedIndex === -1
+        ? "Nouvelle restaurant"
+        : "Modifier restaurant";
+    }
+  },
+
   methods: {
     getRestaurantsFromServer() {
       this.loading = true;
@@ -147,25 +175,64 @@ export default {
           console.log("[ERROR] " + err);
         });
     },
-    supprimer(id){
-      fetch(this.url + "/" + id, { method: "DELETE" })
-      .then(response => {
+    supprimer(id) {
+      if (
+        confirm("vous etes sur que vous voulez supprimer cette restaurant?")
+      ) {
+        this.loading = true;
+        fetch(this.url + "/" + id, { method: "DELETE" })
+          .then(response => {
+            return response.json();
+          })
+          .then(json => {
+            console.log(json);
+            this.getRestaurantsFromServer();
+          })
+          .catch(err => {
+            console.log("[ERROR] " + err);
+          });
+      }
+    },
+    modifier(restaurant) {
+      this.editedItem.name = restaurant.name;
+      this.editedItem.cuisine = restaurant.cuisine;
+      this.editedItem.id = restaurant._id;
+      this.dialog = true;
+    },
+    fermer() {
+      this.dialog = false;
+      this.editedItem.name = "";
+      this.editedItem.cuisine = "";
+      this.editedItem.id = -1;
+    },
+    enregistrer() {
+      let restaurant = new FormData();
+      restaurant.append("nom", this.editedItem.name);
+      restaurant.append("cuisine", this.editedItem.cuisine);
+      let method = this.editedItem.id == -1 ? "POST" : "PUT";
+      let params = this.editedItem.id == -1 ? "" : ("/" + this.editedItem.id) ;
+
+      this.dialog = false;
+      
+      let self = this;
+      self.loading = true;
+      
+      fetch(this.url + params, {
+        method: method,
+        body: restaurant
+      })
+        .then(function(response) {
           return response.json();
         })
-        .then(json => {
-          console.log(json)
+        .then(function(json) {
+            console.log(json);
+            self.getRestaurantsFromServer();
         })
-        .catch(err => {
+        .catch(function(err) {
           console.log("[ERROR] " + err);
         });
-    },
-    fermer () {
-        this.dialog = false
-        setTimeout(() => {
-          //this.editedItem = Object.assign({}, this.defaultItem)
-          //this.editedIndex = -1
-        }, 300)
-      },
+        
+    }
   }
 };
 </script>
